@@ -39,6 +39,8 @@ import {
   Events,
 } from "discord.js";
 
+import { joinVoiceChannel, createAudioPlayer, createAudioResource } from "@discordjs/voice";
+
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -48,68 +50,78 @@ const client = new Client({
   ],
 });
 
-// ====================== VARIÁVEIS DO .ENV =================
+// ====================== VARIÁVEIS DO .ENV ==============
 const CANAL_PEDIR_SET = process.env.CANAL_PEDIR_SET;
 const CANAL_ACEITA_SET = process.env.CANAL_ACEITA_SET;
 const CARGO_APROVADO = process.env.CARGO_APROVADO;
 const CARGO_APROVADO_2 = process.env.CARGO_APROVADO_2;
+const CALL_24H = process.env.CALL_24H;
 const TOKEN = process.env.TOKEN;
 
-// ====================== BOT ONLINE ========================
+// ====================== BOT ONLINE ======================
 client.on("ready", async () => {
   console.log(`🤖 Bot ligado como ${client.user.tag}`);
 
-  const canal = await client.channels.fetch(CANAL_PEDIR_SET);
+  // Mensagem de registro
+  try {
+    const canal = await client.channels.fetch(CANAL_PEDIR_SET);
+    if (!canal) throw new Error("Canal de registro não encontrado ou sem permissão");
 
-  const embed = new EmbedBuilder()
-    .setTitle("Sistema Família DriftKing ")
-    .setDescription(
-      "Registro A7.\n\n Solicite SET usando o botão abaixo.\nPreencha com atenção!"
-    )
-    .addFields({
-      name: "📌 Lembretes",
-      value: `• A resenha aqui é garantida.\n• Não leve tudo a sério.`,
-    })
-    .setColor("#f1c40f");
+    const embed = new EmbedBuilder()
+      .setTitle("Sistema Família DriftKing ")
+      .setDescription("Registro A7.\n\n Solicite SET usando o botão abaixo.\nPreencha com atenção!")
+      .addFields({
+        name: "📌 Lembretes",
+        value: "• A resenha aqui é garantida.\n• Não leve tudo a sério.",
+      })
+      .setColor("#f1c40f");
 
-  const btn = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId("abrirRegistro")
-      .setLabel("Registro")
-      .setStyle(ButtonStyle.Primary)
-  );
+    const btn = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId("abrirRegistro")
+        .setLabel("Registro")
+        .setStyle(ButtonStyle.Primary)
+    );
 
-  await canal.send({ embeds: [embed], components: [btn] });
+    await canal.send({ embeds: [embed], components: [btn] });
+    console.log("📩 Mensagem de registro enviada!");
+  } catch (err) {
+    console.log("❌ Erro ao enviar mensagem de registro:", err.message);
+  }
 
-  console.log("📩 Mensagem de registro enviada!");
+  // Conectar no canal de voz 24h
+  try {
+    const canalVoz = await client.channels.fetch(CALL_24H);
+    if (!canalVoz) throw new Error("Canal de voz 24h não encontrado ou sem permissão");
+
+    const conexao = joinVoiceChannel({
+      channelId: canalVoz.id,
+      guildId: canalVoz.guild.id,
+      adapterCreator: canalVoz.guild.voiceAdapterCreator,
+      selfDeaf: false,
+    });
+
+    const player = createAudioPlayer();
+    const resource = createAudioResource("silencio.mp3");
+    player.play(resource);
+    conexao.subscribe(player);
+
+    console.log("🔊 Bot conectado no canal de voz 24h!");
+  } catch (err) {
+    console.log("❌ Erro ao conectar no canal de voz 24h:", err.message);
+  }
 });
 
-// ====================== ABRIR MODAL ========================
+// ====================== ABRIR MODAL =====================
 client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isButton()) return;
   if (interaction.customId !== "abrirRegistro") return;
 
-  const modal = new ModalBuilder()
-    .setCustomId("modalRegistro")
-    .setTitle("Solicitação de Set");
+  const modal = new ModalBuilder().setCustomId("modalRegistro").setTitle("Solicitação de Set");
 
-  const nome = new TextInputBuilder()
-    .setCustomId("nome")
-    .setLabel("Seu nome*")
-    .setRequired(true)
-    .setStyle(TextInputStyle.Short);
-
-  const id = new TextInputBuilder()
-    .setCustomId("iduser")
-    .setLabel("Seu ID *")
-    .setRequired(true)
-    .setStyle(TextInputStyle.Short);
-
-  const recrutador = new TextInputBuilder()
-    .setCustomId("recrutador")
-    .setLabel("Nome de quem te recrutou *")
-    .setRequired(true)
-    .setStyle(TextInputStyle.Short);
+  const nome = new TextInputBuilder().setCustomId("nome").setLabel("Seu nome*").setRequired(true).setStyle(TextInputStyle.Short);
+  const id = new TextInputBuilder().setCustomId("iduser").setLabel("Seu ID *").setRequired(true).setStyle(TextInputStyle.Short);
+  const recrutador = new TextInputBuilder().setCustomId("recrutador").setLabel("Nome de quem te recrutou *").setRequired(true).setStyle(TextInputStyle.Short);
 
   modal.addComponents(
     new ActionRowBuilder().addComponents(nome),
@@ -120,7 +132,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   await interaction.showModal(modal);
 });
 
-// ====================== RECEBER FORM ========================
+// ====================== RECEBER FORM =====================
 client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isModalSubmit()) return;
   if (interaction.customId !== "modalRegistro") return;
@@ -129,76 +141,55 @@ client.on(Events.InteractionCreate, async (interaction) => {
   const iduser = interaction.fields.getTextInputValue("iduser");
   const recrutador = interaction.fields.getTextInputValue("recrutador");
 
-  const recrutadorFormatado = recrutador.trim().toLowerCase();
+  const recrutadores = { "lm": "LM", "a7": "A7", "dk": "DriftKing", "m4": "M4" };
+  const recrutadorOficial = recrutadores[recrutador.trim().toLowerCase()] || recrutador;
 
-  const recrutadores = {
-    "lm": "LM",
-    "a7": "A7",
-    "dk": "DriftKing",
-    "m4": "M4",
-  };
+  try {
+    const canal = await client.channels.fetch(CANAL_ACEITA_SET);
+    if (!canal) throw new Error("Canal de aprovação não encontrado ou sem permissão");
 
-  const recrutadorOficial = recrutadores[recrutadorFormatado] || recrutador;
+    const embed = new EmbedBuilder()
+      .setTitle("Novo Pedido de Registro")
+      .setColor("#3498db")
+      .setThumbnail(interaction.user.displayAvatarURL())
+      .addFields(
+        { name: "Usuário", value: `${interaction.user}` },
+        { name: "Nome Informado", value: nome },
+        { name: "ID Informado", value: iduser },
+        { name: "Recrutador", value: recrutadorOficial },
+        { name: "Conta Criada em", value: `<t:${Math.floor(interaction.user.createdTimestamp / 1000)}:R>` }
+      );
 
-  const canal = await client.channels.fetch(CANAL_ACEITA_SET);
-
-  const embed = new EmbedBuilder()
-    .setTitle("Novo Pedido de Registro")
-    .setColor("#3498db")
-    .setThumbnail(interaction.user.displayAvatarURL())
-    .addFields(
-      { name: "Usuário", value: `${interaction.user}` },
-      { name: "Nome Informado", value: nome },
-      { name: "ID Informado", value: iduser },
-      { name: "Recrutador", value: recrutadorOficial },
-      {
-        name: "Conta Criada em",
-        value: `<t:${Math.floor(interaction.user.createdTimestamp / 1000)}:R>`,
-      }
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`aprovar_${interaction.user.id}`).setLabel("Aprovar").setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId(`negar_${interaction.user.id}`).setLabel("Negar").setStyle(ButtonStyle.Danger)
     );
 
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId(`aprovar_${interaction.user.id}`)
-      .setLabel("Aprovar")
-      .setStyle(ButtonStyle.Success),
-    new ButtonBuilder()
-      .setCustomId(`negar_${interaction.user.id}`)
-      .setLabel("Negar")
-      .setStyle(ButtonStyle.Danger)
-  );
+    await canal.send({ embeds: [embed], components: [row] });
+    await interaction.reply({ content: "Seu pedido foi enviado!", ephemeral: true });
 
-  await canal.send({ embeds: [embed], components: [row] });
-
-  await interaction.reply({
-    content: "Seu pedido foi enviado!",
-    ephemeral: true,
-  });
+  } catch (err) {
+    console.log("❌ Erro ao enviar registro:", err.message);
+    await interaction.reply({ content: "❌ Não foi possível enviar o pedido, fale com um administrador.", ephemeral: true });
+  }
 });
 
-// =================== APROVAR / NEGAR ===================
+// =================== APROVAR / NEGAR ====================
 client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isButton()) return;
-
   const [acao, userId] = interaction.customId.split("_");
   if (!["aprovar", "negar"].includes(acao)) return;
 
-  const membro = await interaction.guild.members.fetch(userId);
-  const embedOriginal = interaction.message.embeds[0];
+  try {
+    const membro = await interaction.guild.members.fetch(userId);
+    const embedOriginal = interaction.message.embeds[0];
+    const nomeInformado = embedOriginal.fields.find(f => f.name === "Nome Informado")?.value;
+    const idInformado = embedOriginal.fields.find(f => f.name === "ID Informado")?.value;
+    const recrutadorOficial = embedOriginal.fields.find(f => f.name === "Recrutador")?.value;
 
-  const nomeInformado = embedOriginal.fields.find(f => f.name === "Nome Informado")?.value;
-  const idInformado = embedOriginal.fields.find(f => f.name === "ID Informado")?.value;
-  const recrutadorOficial = embedOriginal.fields.find(f => f.name === "Recrutador")?.value;
-
-  // ========== APROVAR ==========
-  if (acao === "aprovar") {
-    try {
+    if (acao === "aprovar") {
       await membro.setNickname(`M | ${nomeInformado} | ${idInformado}`);
-
-      await membro.roles.add([
-        CARGO_APROVADO,
-        CARGO_APROVADO_2,
-      ]);
+      await membro.roles.add([CARGO_APROVADO, CARGO_APROVADO_2]);
 
       // ======== RANKING ========
       const hoje = new Date();
@@ -217,19 +208,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       addRank("semana", semana, recrutadorOficial);
       addRank("mes", mes, recrutadorOficial);
       addRank("ano", ano, recrutadorOficial);
-
       salvarRanking();
-
-      // ======= MENSAGEM PRO USUÁRIO =======
-      const mensagem = `
-<a:coroa4:1425236745762504768> **Seja Muito Bem-vindo a DriftKing ** <:emojia7:1429141492080967730>
-
-**Parabéns! Agora você é um membro oficial da Family DriftKing!**
-
-✨ **Seja muito bem-vindo!** ✨
-`;
-
-      await membro.send(mensagem).catch(() => {});
 
       const embedAprovado = new EmbedBuilder()
         .setColor("Green")
@@ -243,87 +222,40 @@ client.on(Events.InteractionCreate, async (interaction) => {
         .setThumbnail(membro.user.displayAvatarURL())
         .setFooter({ text: "Aprovado com sucesso!" });
 
-      await interaction.update({
-        embeds: [embedAprovado],
-        components: []
-      });
+      await interaction.update({ embeds: [embedAprovado], components: [] });
+      await membro.send("✨ **Parabéns! Agora você é um membro oficial da Family DriftKing!**").catch(() => {});
 
-    } catch (e) {
-      console.log(e);
-      return interaction.reply({
-        content: "❌ Erro ao aprovar. Verifique permissões.",
-        ephemeral: true
-      });
-    }
-  }
-
-  // ========== NEGAR ==========
-  if (acao === "negar") {
-    try {
+    } else if (acao === "negar") {
       await membro.kick("Registro negado pelo aprovador.");
-
       const embedNegado = new EmbedBuilder()
         .setColor("Red")
         .setTitle("Registro Negado")
         .setDescription(`❌ O usuário **${membro.user.tag}** foi expulso.\nNegado por: ${interaction.user}`)
         .setThumbnail(membro.user.displayAvatarURL());
 
-      await interaction.update({
-        embeds: [embedNegado],
-        components: []
-      });
-
-    } catch (e) {
-      console.log(e);
-      return interaction.reply({
-        content: "❌ Não consegui expulsar o usuário.",
-        ephemeral: true
-      });
+      await interaction.update({ embeds: [embedNegado], components: [] });
     }
+
+  } catch (err) {
+    console.log("❌ Erro ao processar aprovação/negação:", err.message);
+    await interaction.reply({ content: "❌ Não foi possível processar a ação.", ephemeral: true });
   }
 });
 
-// ==================== BOT EM CALL 24H ====================
-import { joinVoiceChannel, createAudioPlayer, createAudioResource } from "@discordjs/voice";
-
-client.on("ready", async () => {
-  try {
-    const canal = client.channels.cache.get(process.env.CALL_24H);
-    if (!canal) return console.log("❌ Canal de voz não encontrado!");
-
-    const conexao = joinVoiceChannel({
-      channelId: canal.id,
-      guildId: canal.guild.id,
-      adapterCreator: canal.guild.voiceAdapterCreator,
-      selfDeaf: false
-    });
-
-    const player = createAudioPlayer();
-    const resource = createAudioResource("silencio.mp3");
-
-    player.play(resource);
-    conexao.subscribe(player);
-  } catch (e) {
-    console.log("Erro ao conectar no canal de voz:", e);
-  }
-});
-
-// ==================== COMANDO RANKING ====================
-client.on(Events.InteractionCreate, async interaction => {
+// ==================== COMANDO RANKING ===================
+client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
   if (interaction.commandName !== "ranking") return;
 
   const tipo = interaction.options.getString("periodo");
-
-  if (!ranking[tipo]) 
-    return interaction.reply({ content: "Nenhum registro encontrado.", ephemeral: true });
+  if (!ranking[tipo]) return interaction.reply({ content: "Nenhum registro encontrado.", ephemeral: true });
 
   const chaves = Object.keys(ranking[tipo]).sort().reverse();
   const ultima = ranking[tipo][chaves[0]];
 
   const texto = Object.entries(ultima)
-    .sort((a,b) => b[1] - a[1])
-    .map(([nome, qtd], i) => `${i+1}. **${nome}** — ${qtd} recrutamentos`)
+    .sort((a,b) => b[1]-a[1])
+    .map(([nome,qtd],i) => `${i+1}. **${nome}** — ${qtd} recrutamentos`)
     .join("\n");
 
   const embed = new EmbedBuilder()
@@ -333,22 +265,5 @@ client.on(Events.InteractionCreate, async interaction => {
 
   return interaction.reply({ embeds: [embed] });
 });
-
-const canal = client.channels.cache.get(process.env.CALL_24H);
-if (!canal) {
-  console.log("❌ Canal de voz não encontrado ou sem permissão!");
-} else {
-  const conexao = joinVoiceChannel({
-    channelId: canal.id,
-    guildId: canal.guild.id,
-    adapterCreator: canal.guild.voiceAdapterCreator,
-    selfDeaf: false
-  });
-  const player = createAudioPlayer();
-  const resource = createAudioResource("silencio.mp3");
-  player.play(resource);
-  conexao.subscribe(player);
-}
-
 
 client.login(TOKEN);
