@@ -1,18 +1,22 @@
-// NOVA VERSÃO COMPLETA DO INDEX.JS — ATUALIZADO COM:
-// ✅ Nome final: M | Nome | ID fornecido
-// ✅ Modal inclui: Nome, ID e Quem te recrutou
-// ✅ Reconhecimento automático do recrutador (LM, A7, etc.)
-// ✅ Ranking diário, semanal, mensal e anual de recrutadores
-// ---------------------------------------------------------
-
 // ====================== KEEP ALIVE ======================
 const express = require("express");
 const app = express();
+
+// Página inicial para o UptimeRobot pingar
 app.get("/", (req, res) => res.send("Bot ativo e rodando 24h! 🚀"));
+
 app.listen(3000, () => console.log("🌐 KeepAlive ativo na porta 3000!"));
 
 // ====================== DOTENV ==========================
 require("dotenv").config();
+
+// ====================== JSON RANKING ======================
+const fs = require("fs");
+let ranking = JSON.parse(fs.readFileSync("recrutadores.json", "utf8"));
+
+function salvarRanking() {
+  fs.writeFileSync("recrutadores.json", JSON.stringify(ranking, null, 2));
+}
 
 // ====================== DISCORD.JS ======================
 const {
@@ -37,57 +41,68 @@ const client = new Client({
   ],
 });
 
-// ====================== VARIÁVEIS =======================
+// ====================== VARIÁVEIS DO .ENV =================
 const CANAL_PEDIR_SET = process.env.CANAL_PEDIR_SET;
 const CANAL_ACEITA_SET = process.env.CANAL_ACEITA_SET;
 const CARGO_APROVADO = process.env.CARGO_APROVADO;
 const CARGO_APROVADO_2 = process.env.CARGO_APROVADO_2;
 const TOKEN = process.env.TOKEN;
 
-// ====================== RANKING =========================
-// Armazena o número de recrutas por recrutador em vários períodos
-const ranking = {
-  dia: {},
-  semana: {},
-  mes: {},
-  ano: {},
-};
-
-function addRecrutamento(nome) {
-  const keys = ["dia", "semana", "mes", "ano"];
-  keys.forEach((k) => {
-    if (!ranking[k][nome]) ranking[k][nome] = 0;
-    ranking[k][nome]++;
-  });
-}
-
+// ====================== BOT ONLINE ========================
 client.on("ready", async () => {
   console.log(`🤖 Bot ligado como ${client.user.tag}`);
 
   const canal = await client.channels.fetch(CANAL_PEDIR_SET);
 
   const embed = new EmbedBuilder()
-    .setTitle("Sistema Família Do7")
-    .setDescription("Solicite SET usando o botão abaixo.")
-    .setColor("Yellow");
+    .setTitle("Sistema Família DriftKing ")
+    .setDescription(
+      "Registro A7.\n\n Solicite SET usando o botão abaixo.\nPreencha com atenção!"
+    )
+    .addFields({
+      name: "📌 Lembretes",
+      value: `• A resenha aqui é garantida.\n• Não leve tudo a sério.`,
+    })
+    .setColor("#f1c40f");
 
   const btn = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId("abrirRegistro").setLabel("Registro").setStyle(ButtonStyle.Primary)
+    new ButtonBuilder()
+      .setCustomId("abrirRegistro")
+      .setLabel("Registro")
+      .setStyle(ButtonStyle.Primary)
   );
 
   await canal.send({ embeds: [embed], components: [btn] });
+
+  console.log("📩 Mensagem de registro enviada!");
 });
 
-// ====================== MODAL ===========================
+// ====================== ABRIR MODAL ========================
 client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isButton()) return;
   if (interaction.customId !== "abrirRegistro") return;
 
-  const modal = new ModalBuilder().setCustomId("modalRegistro").setTitle("Solicitação de Set");
+  const modal = new ModalBuilder()
+    .setCustomId("modalRegistro")
+    .setTitle("Solicitação de Set");
 
-  const nome = new TextInputBuilder().setCustomId("nome").setLabel("Seu nome*").setRequired(true).setStyle(TextInputStyle.Short);
-  const id = new TextInputBuilder().setCustomId("iduser").setLabel("Seu ID*").setRequired(true).setStyle(TextInputStyle.Short);
-  const recrutador = new TextInputBuilder().setCustomId("recruiter").setLabel("Quem te recrutou?*").setRequired(true).setStyle(TextInputStyle.Short);
+  const nome = new TextInputBuilder()
+    .setCustomId("nome")
+    .setLabel("Seu nome*")
+    .setRequired(true)
+    .setStyle(TextInputStyle.Short);
+
+  const id = new TextInputBuilder()
+    .setCustomId("iduser")
+    .setLabel("Seu ID *")
+    .setRequired(true)
+    .setStyle(TextInputStyle.Short);
+
+  const recrutador = new TextInputBuilder()
+    .setCustomId("recrutador")
+    .setLabel("Nome de quem te recrutou *")
+    .setRequired(true)
+    .setStyle(TextInputStyle.Short);
 
   modal.addComponents(
     new ActionRowBuilder().addComponents(nome),
@@ -98,112 +113,218 @@ client.on(Events.InteractionCreate, async (interaction) => {
   await interaction.showModal(modal);
 });
 
-// ====================== RECEBER MODAL ====================
+// ====================== RECEBER FORM ========================
 client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isModalSubmit()) return;
   if (interaction.customId !== "modalRegistro") return;
 
   const nome = interaction.fields.getTextInputValue("nome");
   const iduser = interaction.fields.getTextInputValue("iduser");
-  const recrutadorTexto = interaction.fields.getTextInputValue("recruiter");
+  const recrutador = interaction.fields.getTextInputValue("recrutador");
 
-  // Detectar recrutador automaticamente (LM, L7, A7, etc.)
-  const recrutador = recrutadorTexto.toUpperCase();
+  const recrutadorFormatado = recrutador.trim().toLowerCase();
+
+  const recrutadores = {
+    "lm": "LM",
+    "a7": "A7",
+    "dk": "DriftKing",
+    "m4": "M4",
+  };
+
+  const recrutadorOficial = recrutadores[recrutadorFormatado] || recrutador;
 
   const canal = await client.channels.fetch(CANAL_ACEITA_SET);
 
   const embed = new EmbedBuilder()
     .setTitle("Novo Pedido de Registro")
-    .setColor("Blue")
+    .setColor("#3498db")
+    .setThumbnail(interaction.user.displayAvatarURL())
     .addFields(
-      { name: "Nome", value: nome },
-      { name: "ID", value: iduser },
-      { name: "Recrutador", value: recrutador },
-      { name: "Usuário", value: `${interaction.user}` }
+      { name: "Usuário", value: `${interaction.user}` },
+      { name: "Nome Informado", value: nome },
+      { name: "ID Informado", value: iduser },
+      { name: "Recrutador", value: recrutadorOficial },
+      {
+        name: "Conta Criada em",
+        value: `<t:${Math.floor(interaction.user.createdTimestamp / 1000)}:R>`,
+      }
     );
 
   const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`aprovar_${interaction.user.id}_${recrutador}`).setLabel("Aprovar").setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId(`negar_${interaction.user.id}`).setLabel("Negar").setStyle(ButtonStyle.Danger)
+    new ButtonBuilder()
+      .setCustomId(`aprovar_${interaction.user.id}`)
+      .setLabel("Aprovar")
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId(`negar_${interaction.user.id}`)
+      .setLabel("Negar")
+      .setStyle(ButtonStyle.Danger)
   );
 
   await canal.send({ embeds: [embed], components: [row] });
 
-  await interaction.reply({ content: "Seu pedido foi enviado!", ephemeral: true });
+  await interaction.reply({
+    content: "Seu pedido foi enviado!",
+    ephemeral: true,
+  });
 });
 
-// ====================== APROVAR / NEGAR ==================
+// =================== APROVAR / NEGAR ===================
 client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isButton()) return;
 
-  const split = interaction.customId.split("_");
-  const acao = split[0];
-  const userId = split[1];
-  const recrutador = split[2];
+  const [acao, userId] = interaction.customId.split("_");
+  if (!["aprovar", "negar"].includes(acao)) return;
 
   const membro = await interaction.guild.members.fetch(userId);
-
   const embedOriginal = interaction.message.embeds[0];
-  const nomeInformado = embedOriginal.fields.find((f) => f.name === "Nome").value;
-  const idInformado = embedOriginal.fields.find((f) => f.name === "ID").value;
+
+  const nomeInformado = embedOriginal.fields.find(f => f.name === "Nome Informado")?.value;
+  const idInformado = embedOriginal.fields.find(f => f.name === "ID Informado")?.value;
+  const recrutadorOficial = embedOriginal.fields.find(f => f.name === "Recrutador")?.value;
 
   // ========== APROVAR ==========
   if (acao === "aprovar") {
-    const novoNome = `M | ${nomeInformado} | ${idInformado}`;
+    try {
+      await membro.setNickname(`M | ${nomeInformado} | ${idInformado}`);
 
-    await membro.setNickname(novoNome);
-    await membro.roles.add([CARGO_APROVADO, CARGO_APROVADO_2]);
+      await membro.roles.add([
+        CARGO_APROVADO,
+        CARGO_APROVADO_2,
+      ]);
 
-    // Contabilizar recrutador no ranking
-    addRecrutamento(recrutador);
+      // ======== RANKING ========
+      const hoje = new Date();
+      const dia = hoje.toISOString().split("T")[0];
+      const semana = `W${Math.ceil(hoje.getUTCDate() / 7)}-${hoje.getUTCFullYear()}`;
+      const mes = `${hoje.getMonth() + 1}-${hoje.getFullYear()}`;
+      const ano = `${hoje.getFullYear()}`;
 
-    await membro.send("🎉 Seu SET foi aprovado! Seja bem-vindo!").catch(() => {});
+      function addRank(tipo, chave, quem) {
+        if (!ranking[tipo]) ranking[tipo] = {};
+        if (!ranking[tipo][chave]) ranking[tipo][chave] = {};
+        ranking[tipo][chave][quem] = (ranking[tipo][chave][quem] || 0) + 1;
+      }
 
-    const embedAprovado = new EmbedBuilder()
-      .setTitle("SET Aprovado")
-      .setColor("Green")
-      .addFields(
-        { name: "Usuário", value: `${membro}` },
-        { name: "Novo Nome", value: novoNome },
-        { name: "Recrutador", value: recrutador }
-      );
+      addRank("dia", dia, recrutadorOficial);
+      addRank("semana", semana, recrutadorOficial);
+      addRank("mes", mes, recrutadorOficial);
+      addRank("ano", ano, recrutadorOficial);
 
-    await interaction.update({ embeds: [embedAprovado], components: [] });
+      salvarRanking();
+
+      // ======= MENSAGEM PRO USUÁRIO =======
+      const mensagem = `
+<a:coroa4:1425236745762504768> **Seja Muito Bem-vindo a DriftKing ** <:emojia7:1429141492080967730>
+
+**Parabéns! Agora você é um membro oficial da Family DriftKing!**
+
+✨ **Seja muito bem-vindo!** ✨
+`;
+
+      await membro.send(mensagem).catch(() => {});
+
+      const embedAprovado = new EmbedBuilder()
+        .setColor("Green")
+        .setTitle("Registro Aprovado")
+        .addFields(
+          { name: "👤 Usuário:", value: `${membro}` },
+          { name: "🪪 ID:", value: `${idInformado}` },
+          { name: "📛 Nome Setado:", value: `M | ${nomeInformado} | ${idInformado}` },
+          { name: "🧭 Acesso aprovado por:", value: `${interaction.user}` }
+        )
+        .setThumbnail(membro.user.displayAvatarURL())
+        .setFooter({ text: "Aprovado com sucesso!" });
+
+      await interaction.update({
+        embeds: [embedAprovado],
+        components: []
+      });
+
+    } catch (e) {
+      console.log(e);
+      return interaction.reply({
+        content: "❌ Erro ao aprovar. Verifique permissões.",
+        ephemeral: true
+      });
+    }
   }
 
   // ========== NEGAR ==========
   if (acao === "negar") {
-    await membro.kick("SET recusado");
+    try {
+      await membro.kick("Registro negado pelo aprovador.");
 
-    await interaction.update({
-      embeds: [new EmbedBuilder().setColor("Red").setDescription(`❌ Usuário ${membro.user.tag} removido.`)],
-      components: [],
-    });
+      const embedNegado = new EmbedBuilder()
+        .setColor("Red")
+        .setTitle("Registro Negado")
+        .setDescription(`❌ O usuário **${membro.user.tag}** foi expulso.\nNegado por: ${interaction.user}`)
+        .setThumbnail(membro.user.displayAvatarURL());
+
+      await interaction.update({
+        embeds: [embedNegado],
+        components: []
+      });
+
+    } catch (e) {
+      console.log(e);
+      return interaction.reply({
+        content: "❌ Não consegui expulsar o usuário.",
+        ephemeral: true
+      });
+    }
   }
 });
 
-// ====================== RANKING COMANDO =================
-client.on("messageCreate", async (msg) => {
-  if (msg.content !== "!ranking") return;
+// ==================== BOT EM CALL 24H ====================
+const { joinVoiceChannel, createAudioPlayer, createAudioResource } = require("@discordjs/voice");
 
-  function gerarTabela(obj) {
-    return Object.entries(obj)
-      .sort((a, b) => b[1] - a[1])
-      .map((x) => `**${x[0]}** — ${x[1]} recrutamentos`)
-      .join("\n");
+client.on("ready", async () => {
+  try {
+    const canal = client.channels.cache.get(process.env.CALL_24H);
+    if (!canal) return console.log("❌ Canal de voz não encontrado!");
+
+    const conexao = joinVoiceChannel({
+      channelId: canal.id,
+      guildId: canal.guild.id,
+      adapterCreator: canal.guild.voiceAdapterCreator,
+      selfDeaf: false
+    });
+
+    const player = createAudioPlayer();
+    const resource = createAudioResource("silencio.mp3");
+
+    player.play(resource);
+    conexao.subscribe(player);
+  } catch (e) {
+    console.log("Erro ao conectar no canal de voz:", e);
   }
+});
+
+// ==================== COMANDO RANKING ====================
+client.on(Events.InteractionCreate, async interaction => {
+  if (!interaction.isChatInputCommand()) return;
+  if (interaction.commandName !== "ranking") return;
+
+  const tipo = interaction.options.getString("periodo");
+
+  if (!ranking[tipo]) 
+    return interaction.reply({ content: "Nenhum registro encontrado.", ephemeral: true });
+
+  const chaves = Object.keys(ranking[tipo]).sort().reverse();
+  const ultima = ranking[tipo][chaves[0]];
+
+  const texto = Object.entries(ultima)
+    .sort((a,b) => b[1] - a[1])
+    .map(([nome, qtd], i) => `${i+1}. **${nome}** — ${qtd} recrutamentos`)
+    .join("\n");
 
   const embed = new EmbedBuilder()
-    .setTitle("🏆 Ranking de Recrutadores")
+    .setTitle(`🏆 Ranking de Recrutadores (${tipo.toUpperCase()})`)
     .setColor("Gold")
-    .addFields(
-      { name: "📅 Hoje", value: gerarTabela(ranking.dia) || "Ninguém" },
-      { name: "📆 Semana", value: gerarTabela(ranking.semana) || "Ninguém" },
-      { name: "📅 Mês", value: gerarTabela(ranking.mes) || "Ninguém" },
-      { name: "📅 Ano", value: gerarTabela(ranking.ano) || "Ninguém" }
-    );
+    .setDescription(texto);
 
-  msg.reply({ embeds: [embed] });
+  return interaction.reply({ embeds: [embed] });
 });
 
 client.login(TOKEN);
