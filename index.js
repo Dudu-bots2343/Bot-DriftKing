@@ -334,4 +334,21 @@ client.on(Events.InteractionCreate, async interaction => {
   return interaction.reply({ embeds: [embed] });
 });
 
+const canal = client.channels.cache.get(process.env.CALL_24H);
+if (!canal) {
+  console.log("❌ Canal de voz não encontrado ou sem permissão!");
+} else {
+  const conexao = joinVoiceChannel({
+    channelId: canal.id,
+    guildId: canal.guild.id,
+    adapterCreator: canal.guild.voiceAdapterCreator,
+    selfDeaf: false
+  });
+  const player = createAudioPlayer();
+  const resource = createAudioResource("silencio.mp3");
+  player.play(resource);
+  conexao.subscribe(player);
+}
+
+
 client.login(TOKEN);
