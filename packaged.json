@@ -1,7 +1,7 @@
 {
   "name": "bot-familia-a7",
   "version": "1.0.0",
-  "description": "Bot Discord Driftking com registro, ranking e call 24h",
+  "description": "Bot Discord Família A7 com registro, ranking e call 24h",
   "main": "index.js",
   "type": "module",
   "scripts": {
