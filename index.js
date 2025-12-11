@@ -2,7 +2,6 @@
 import express from "express";
 const app = express();
 
-// Página inicial para o UptimeRobot pingar
 app.get("/", (req, res) => res.send("Bot ativo e rodando 24h! 🚀"));
 
 app.listen(3000, () => console.log("🌐 KeepAlive ativo na porta 3000!"));
@@ -13,7 +12,14 @@ dotenv.config();
 
 // ====================== JSON RANKING ===================
 import fs from "fs";
-let ranking = JSON.parse(fs.readFileSync("recrutadores.json", "utf8"));
+
+let ranking = {};
+try {
+  ranking = JSON.parse(fs.readFileSync("recrutadores.json", "utf8"));
+} catch (err) {
+  console.log("Arquivo recrutadores.json não encontrado, criando um novo...");
+  fs.writeFileSync("recrutadores.json", JSON.stringify(ranking, null, 2));
+}
 
 function salvarRanking() {
   fs.writeFileSync("recrutadores.json", JSON.stringify(ranking, null, 2));
