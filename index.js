@@ -1,5 +1,5 @@
 // ====================== KEEP ALIVE ======================
-const express = require("express");
+import express from "express";
 const app = express();
 
 // Página inicial para o UptimeRobot pingar
@@ -8,18 +8,19 @@ app.get("/", (req, res) => res.send("Bot ativo e rodando 24h! 🚀"));
 app.listen(3000, () => console.log("🌐 KeepAlive ativo na porta 3000!"));
 
 // ====================== DOTENV ==========================
-require("dotenv").config();
+import dotenv from "dotenv";
+dotenv.config();
 
-// ====================== JSON RANKING ======================
-const fs = require("fs");
+// ====================== JSON RANKING ===================
+import fs from "fs";
 let ranking = JSON.parse(fs.readFileSync("recrutadores.json", "utf8"));
 
 function salvarRanking() {
   fs.writeFileSync("recrutadores.json", JSON.stringify(ranking, null, 2));
 }
 
-// ====================== DISCORD.JS ======================
-const {
+// ====================== DISCORD.JS =====================
+import {
   Client,
   GatewayIntentBits,
   EmbedBuilder,
@@ -30,7 +31,7 @@ const {
   TextInputBuilder,
   TextInputStyle,
   Events,
-} = require("discord.js");
+} from "discord.js";
 
 const client = new Client({
   intents: [
@@ -277,7 +278,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 });
 
 // ==================== BOT EM CALL 24H ====================
-const { joinVoiceChannel, createAudioPlayer, createAudioResource } = require("@discordjs/voice");
+import { joinVoiceChannel, createAudioPlayer, createAudioResource } from "@discordjs/voice";
 
 client.on("ready", async () => {
   try {
