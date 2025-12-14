@@ -311,5 +311,84 @@ client.on("messageCreate", async (message) => {
   }
 });
 
+import {
+  PermissionsBitField,
+  ChannelType
+} from "discord.js";
+
+client.on("messageCreate", async (message) => {
+  if (message.author.bot) return;
+  if (!message.guild) return;
+
+  if (message.content.toLowerCase() === "!reconstruir") {
+
+    if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+      return message.reply("❌ Você não tem permissão.");
+    }
+
+    await message.reply("🛠️ Reconstruindo o servidor...");
+
+    // ================== CARGOS ==================
+    const adminRole = await message.guild.roles.create({
+      name: "Administrador",
+      color: "Red",
+      permissions: [PermissionsBitField.Flags.Administrator]
+    });
+
+    const modRole = await message.guild.roles.create({
+      name: "Moderador",
+      color: "Blue",
+      permissions: [
+        PermissionsBitField.Flags.ManageMessages,
+        PermissionsBitField.Flags.KickMembers,
+        PermissionsBitField.Flags.BanMembers
+      ]
+    });
+
+    const membroRole = await message.guild.roles.create({
+      name: "Membro",
+      color: "Green"
+    });
+
+    // ================== CATEGORIA TEXTO ==================
+    const catTexto = await message.guild.channels.create({
+      name: "📢・GERAL",
+      type: ChannelType.GuildCategory
+    });
+
+    await message.guild.channels.create({
+      name: "📌│avisos",
+      type: ChannelType.GuildText,
+      parent: catTexto.id
+    });
+
+    await message.guild.channels.create({
+      name: "💬│chat-geral",
+      type: ChannelType.GuildText,
+      parent: catTexto.id
+    });
+
+    // ================== CATEGORIA VOZ ==================
+    const catVoz = await message.guild.channels.create({
+      name: "🎧・VOZ",
+      type: ChannelType.GuildCategory
+    });
+
+    await message.guild.channels.create({
+      name: "🔊 Geral",
+      type: ChannelType.GuildVoice,
+      parent: catVoz.id
+    });
+
+    await message.guild.channels.create({
+      name: "🎮 Jogando",
+      type: ChannelType.GuildVoice,
+      parent: catVoz.id
+    });
+
+    // ================== FINAL ==================
+    message.channel.send("✅ Servidor reconstruído com sucesso!");
+  }
+});
 
 client.login(TOKEN);
